@@ -1,30 +1,35 @@
-from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import JSONResponse
-from PIL import Image
-import torch
+from fastapi import FastAPI, File, UploadFile, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from ultralytics import YOLO
+from PIL import Image
 import io
+import os
 
 app = FastAPI()
 
-# Load YOLO model (adjust path and version as needed)
-model = YOLO("app/model/best.pt")  # can be yolov8.pt or yolov12.pt
+model = YOLO("app/model/best.pt")
 
-@app.get("/")
-def root():
-    return {"message": "Palm Oil Ripeness Detection API is running"}
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
 
-@app.post("/predict/")
-async def predict(file: UploadFile = File(...)):
-    image_data = await file.read()
-    image = Image.open(io.BytesIO(image_data)).convert("RGB")
+
+@app.get("/", response_class=HTMLResponse)
+def home(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request, "result": None})
+
+
+@app.post("/", response_class=HTMLResponse)
+async def predict(request: Request, file: UploadFile = File(...)):
+    contents = await file.read()
+    image = Image.open(io.BytesIO(contents)).convert("RGB")
 
     results = model(image)
-    boxes = results[0].boxes
-    predictions = []
-    for box in boxes:
-        label = int(box.cls[0])
-        conf = float(box.conf[0])
-        predictions.append({"class_id": label, "confidence": round(conf, 3)})
+    label = results[0].names[results[0].probs.top1]  # e.g., "Ripe"
+    conf = float(results[0].probs.top1conf) * 100
 
-    return JSONResponse(content={"predictions": predictions})
+    return templates.TemplateResponse(
+        "index.html",
+        {"request": request, "result": f"{label} ({conf:.2f}% confidence)"}
+    )

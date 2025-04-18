@@ -8,7 +8,7 @@ import io
 app = FastAPI()
 
 # Load YOLO model (adjust path and version as needed)
-model = YOLO("/model/best.pt")  # can be yolov8.pt or yolov12.pt
+model = YOLO("model/best.pt")  # can be yolov8.pt or yolov12.pt
 
 @app.get("/")
 def root():

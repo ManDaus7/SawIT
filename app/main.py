@@ -1,30 +1,39 @@
-from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import JSONResponse
-from PIL import Image
-import torch
+from fastapi import FastAPI, UploadFile, File, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from ultralytics import YOLO
-import io
+import shutil
+import os
 
 app = FastAPI()
 
-# Load YOLO model (adjust path and version as needed)
-model = YOLO("app/model/best.pt")  # can be yolov8.pt or yolov12.pt
+templates = Jinja2Templates(directory="app/templates")
 
-@app.get("/")
-def root():
-    return {"message": "Palm Oil Ripeness Detection API is running"}
+# Load model
+model = YOLO("app/model/best.pt")
 
-@app.post("/predict/")
-async def predict(file: UploadFile = File(...)):
-    image_data = await file.read()
-    image = Image.open(io.BytesIO(image_data)).convert("RGB")
+@app.get("/", response_class=HTMLResponse)
+async def read_root(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
-    results = model(image)
-    boxes = results[0].boxes
-    predictions = []
-    for box in boxes:
-        label = int(box.cls[0])
-        conf = float(box.conf[0])
-        predictions.append({"class_id": label, "confidence": round(conf, 3)})
+@app.post("/predict", response_class=HTMLResponse)
+async def predict(request: Request, file: UploadFile = File(...)):
+    upload_dir = "app/static/uploads"
+    os.makedirs(upload_dir, exist_ok=True)
 
-    return JSONResponse(content={"predictions": predictions})
+    file_path = os.path.join(upload_dir, file.filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    # Run YOLO prediction
+    results = model(file_path)
+    results.save(save_dir=upload_dir)  # Save annotated image
+
+    # Find the new annotated file
+    predicted_image = os.path.join(upload_dir, os.path.basename(results.save_dir[0])) if hasattr(results, 'save_dir') else file.filename
+
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "uploaded_image": f"/static/uploads/{file.filename}",
+    })

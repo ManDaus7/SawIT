@@ -1,17 +1,20 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Palm Oil Ripeness Detector</title>
+    <meta charset="UTF-8">
+    <title>Palm Oil Ripeness Detection</title>
 </head>
-<body>
+<body style="text-align: center; font-family: Arial, sans-serif; margin-top: 50px;">
     <h1>Palm Oil Ripeness Detection</h1>
-    <form method="post" enctype="multipart/form-data">
+    <form action="/predict" method="post" enctype="multipart/form-data">
         <input type="file" name="file" accept="image/*" required>
-        <button type="submit">Upload Image</button>
+        <br><br>
+        <button type="submit">Upload and Predict</button>
     </form>
 
-    {% if result %}
-        <h2>Result: {{ result }}</h2>
+    {% if uploaded_image %}
+    <h2>Prediction Result:</h2>
+    <img src="{{ uploaded_image }}" alt="Predicted Image" style="max-width: 80%; margin-top: 20px;">
     {% endif %}
 </body>
 </html>
